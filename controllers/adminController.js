@@ -1,4 +1,4 @@
-const { models: { User, Doctor, Laboratory, AccessPermission, MedicalRecord, Prescription, LabTest } } = require('../models');
+const { models: { User, Doctor, Laboratory, AccessPermission, Patient, MedicalRecord, Prescription, LabTest } } = require('../models');
 const { Op } = require('sequelize');
 
 // Validate professional registration

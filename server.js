@@ -13,6 +13,21 @@ const app = express();
 const db = require('./config/db');
 const sequelize = require('./sequelize');
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swaggerConfig');
+
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Optional: Serve swagger spec as JSON
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+// ... r
+
 // Middleware
 app.use(cookieParser());
 app.use(cookieSession({
@@ -65,7 +80,7 @@ app.use('/api/v1/patients', patientRoutes);
 app.use('/api/v1/doctors', doctorRoutes);
 app.use('/api/v1/laboratories', laboratoryRoutes);
 app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/access', accessRoutes);
+app.use('/api/v1', accessRoutes);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
