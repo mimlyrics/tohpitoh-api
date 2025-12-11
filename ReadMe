@@ -1,0 +1,7 @@
+After cloning the project from github
+    - cd user-service
+    - npm install
+    - npm run dev
+
+-- postgres db | "talent" created if not already exists
+-- seeders load automatically

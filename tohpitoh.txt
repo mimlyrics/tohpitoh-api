@@ -1,0 +1,71 @@
+// login
+
+//patient-Post
+{
+    "user_id": 2,
+    "gender": "M",
+    "date_of_birth": "17/05/2004",
+    "blood_type": "A+",
+    "genotype": "AA",
+    "known_allergies": "stomach ache",
+    "known_diseases": "none"
+}
+
+{
+    "first_name": "patient",
+    "last_name": "patient",
+    "email": "patient@gmail.com",
+    "password": "patient",
+    "phone": "657585200",
+    "country": "cameroon"
+}
+
+{
+    "emergency_access_enabled": true,
+    "emergency_access_code": "123"
+}
+
+
+{
+    "first_name": "doctor",
+    "last_name": "doctor",
+    "email": "doctor@gmail.com",
+    "password": "doctor",
+    "phone": "657585220",
+    "country": "cameroon"
+}
+
+{
+    "first_name": "laboratory",
+    "last_name": "laboratory",
+    "email": "laboratory@gmail.com",
+    "password": "laboratory",
+    "phone": "657580220",
+    "country": "cameroon"
+}
+
+
+{
+    "lab_name": "labo",
+    "license_number": "labo",
+    "address": "ngoa"
+}
+
+{
+    "patient_id": 1,
+    "medication_name": "surmenalit",
+    "dosage": "500mg",
+    "frequency": "2morning, 2evening",
+    "duration": "2weeks",
+    "end_date": "12-05-2025",
+    "instructions": "drink much water"
+}
+
+{
+    laboratory_id: 5
+    patient_id: 1,
+    record_type: 'consultation',
+    title: Consultation Record 1,
+    description: General consultation record 1,
+    is_shared: false
+}
