@@ -1,4 +1,3 @@
-// db.js — Checks and creates the database if missing
 const { Sequelize } = require("sequelize");
 
 const createDatabase = async () => {
@@ -6,47 +5,52 @@ const createDatabase = async () => {
     const dbName = process.env.PG_DB;
     const dbUser = process.env.PG_USER;
     const dbPass = process.env.PG_PASSWORD;
-    const dbHost = process.env.PG_HOST || "localhost";
+    const dbHost = process.env.PG_HOST;
     const dbPort = process.env.PG_PORT || 5432;
 
-    if (!dbName) {
-      console.error(" PG_DB environment variable is missing.");
+    if (!dbName || !dbHost) {
+      console.error("❌ Missing PG_DB or PG_HOST environment variables.");
       process.exit(1);
     }
 
-    // Connect to the default postgres database
-    const root = new Sequelize("postgres", dbUser, dbPass, {
+    // For cloud databases, you usually CAN'T create databases dynamically
+    // The database is already created by your provider
+    console.log(`ℹ️  Cloud database "${dbName}" at ${dbHost}:${dbPort}`);
+    
+    // Just test the connection
+    const sequelize = new Sequelize(dbName, dbUser, dbPass, {
       host: dbHost,
       port: dbPort,
       dialect: "postgres",
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false // For most cloud DBs
+        }
+      },
       logging: false,
     });
 
-    await root.authenticate();
-
-    console.log("Connected to PostgreSQL root database.");
-
-    // Check database existence using bind parameters (safe)
-    const [results] = await root.query(
-      `SELECT datname FROM pg_database WHERE datname = $1`,
-      { bind: [dbName] }
-    );
-
-    if (results.length === 0) {
-      console.log(`⚠ Database "${dbName}" does NOT exist — creating...`);
-
-      // Use identifier quoting to avoid casing issues & SQL injection
-      await root.query(`CREATE DATABASE "${dbName.replace(/"/g, '""')}"`);
-
-      console.log(`✅ Database "${dbName}" created successfully.`);
-    } else {
-      console.log(`✔ Database "${dbName}" already exists.`);
-    }
-
-    await root.close();
+    await sequelize.authenticate();
+    console.log("✅ Connected to PostgreSQL database.");
+    
+    // No need to create database - it already exists in cloud
+    console.log(`✔️ Database "${dbName}" is ready.`);
+    
+    return sequelize; // Return the connection for use in your app
   } catch (err) {
-    console.error("Error ensuring DB exists:");
-    console.error(err.message || err);
+    console.error("Error connecting to DB:");
+    console.error(err.message);
+    
+    // More specific error messages
+    if (err.name === 'SequelizeConnectionError') {
+      console.error("\ncommon fixes:");
+      console.error("1. Check if PG_HOST is the FULL hostname (e.g., ...render.com)");
+      console.error("2. Add SSL options for cloud databases");
+      console.error("3. Whitelist your IP in the database provider's dashboard");
+      console.error("4. Check if database/user exists in the cloud provider");
+    }
+    
     process.exit(1);
   }
 };
