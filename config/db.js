@@ -1,4 +1,4 @@
-const { Sequelize } = require("sequelize");
+const { Sequelize } = require('sequelize');
 
 const createDatabase = async () => {
   try {
@@ -9,46 +9,46 @@ const createDatabase = async () => {
     const dbPort = process.env.PG_PORT || 5432;
 
     if (!dbName || !dbHost) {
-      console.error("❌ Missing PG_DB or PG_HOST environment variables.");
+      console.error('❌ Missing PG_DB or PG_HOST environment variables.');
       process.exit(1);
     }
 
-    // For cloud databases, you usually CAN'T create databases dynamically
-    // The database is already created by your provider
-    console.log(`ℹ️  Cloud database "${dbName}" at ${dbHost}:${dbPort}`);
-    
-    // Just test the connection
+    console.log(`🔧 Connecting to database "${dbName}" at ${dbHost}:${dbPort}`);
+
+    // Create connection WITH SSL
     const sequelize = new Sequelize(dbName, dbUser, dbPass, {
       host: dbHost,
       port: dbPort,
-      dialect: "postgres",
+      dialect: 'postgres',
       dialectOptions: {
         ssl: {
           require: true,
-          rejectUnauthorized: false // For most cloud DBs
+          rejectUnauthorized: false
         }
       },
       logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+      }
     });
 
     await sequelize.authenticate();
-    console.log("✅ Connected to PostgreSQL database.");
+    console.log('✅ Connected to PostgreSQL database with SSL.');
     
-    // No need to create database - it already exists in cloud
-    console.log(`✔️ Database "${dbName}" is ready.`);
-    
-    return sequelize; // Return the connection for use in your app
+    return sequelize;
   } catch (err) {
-    console.error("Error connecting to DB:");
+    console.error('❌ Error connecting to DB:');
     console.error(err.message);
     
-    // More specific error messages
     if (err.name === 'SequelizeConnectionError') {
-      console.error("\ncommon fixes:");
-      console.error("1. Check if PG_HOST is the FULL hostname (e.g., ...render.com)");
-      console.error("2. Add SSL options for cloud databases");
-      console.error("3. Whitelist your IP in the database provider's dashboard");
-      console.error("4. Check if database/user exists in the cloud provider");
+      console.error('\n🔍 Troubleshooting tips:');
+      console.error('1. Verify SSL is supported by your database provider');
+      console.error('2. Check if hostname is correct (should end with .render.com, .neon.tech, etc.)');
+      console.error('3. Verify username/password are correct');
+      console.error('4. Check if your IP is whitelisted in the database dashboard');
     }
     
     process.exit(1);
