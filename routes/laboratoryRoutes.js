@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const laboratoryController = require('../controllers/laboratoryController');
 const { authenticate, authorize } = require('../middlewares/authMiddleware');
-const adminLaboratoryController = require('../controllers/admin/laboratoryController');
+
 const labTestController = require('../controllers/labtestsController');
 // All routes require authentication
 router.use(authenticate);
@@ -13,7 +13,7 @@ router.put('/profile/me', authorize(['laboratory', 'user']), laboratoryControlle
 
 // Admin laboratory management routes
 router.get('/profile/:userId', authorize('admin'), laboratoryController.getLaboratoryProfileByAdmin);
-router.put('/profile/:userId', authorize('admin'), adminLaboratoryController.updateLaboratoryProfileByAdmin);
+
 router.put('/approve/:laboratoryId', authorize('admin'), laboratoryController.approveLaboratoryProfile);
 
 // Laboratory test management routes

@@ -13,11 +13,6 @@ router.use(authenticate);
 router.get('/profile/me', authorize('doctor'), doctorController.getMyDoctorProfile);
 router.put('/profile/me', authorize(['doctor', 'user']), doctorController.updateMyDoctorProfile); // Allow 'user' to become doctor
 
-// Admin doctor management routes
-router.get('/profile/:userId', authorize('admin'), adminDoctorController.getDoctorProfileByAdmin);
-router.put('/profile/:userId', authorize('admin'), adminDoctorController.updateDoctorProfileByAdmin);
-router.put('/approve/:doctorId', authorize('admin'), adminDoctorController.approveDoctorProfile);
-
 
 // Medical Records (doctor perspective)
 router.get('/medical-records/search', authorize('doctor'), medicalRecordController.searchMedicalRecords);

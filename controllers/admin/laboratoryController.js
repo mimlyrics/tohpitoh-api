@@ -1,113 +1,152 @@
 const asyncHandler = require('express-async-handler');
-const {models: {Laboratory, User, LabTest }} = require('../../models');
+const { models: { Laboratory, User, LabTest } } = require('../../models');
+const { Op } = require('sequelize');
 
+// @desc    Get all laboratories
+// @route   GET /api/admin/laboratories
+// @access  Private/Admin
+exports.getAllLaboratories = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 20, approved, search } = req.query;
+    const offset = (page - 1) * limit;
 
-// Admin update laboratory profile for any user
-exports.updateLaboratoryProfileByAdmin = asyncHandler(async (req, res) => {
-  console.log("\nAdmin updating laboratory profile");
-  console.log("Admin user:", req.user);
-  console.log("Request body:", req.body);
-  
-  const { lab_name, license_number, address, is_approved } = req.body;
-  
-  const { userId } = req.params;
-  console.log("Target laboratory user ID:", userId);
-  
-  // Check if target user exists
-  const user = await User.findByPk(userId);
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      message: 'Target user not found'
+    const whereClause = {};
+    if (approved !== undefined) {
+        whereClause.is_approved = approved === 'true';
+    }
+    if (search) {
+        whereClause[Op.or] = [
+            { lab_name: { [Op.iLike]: `%${search}%` } },
+            { license_number: { [Op.iLike]: `%${search}%` } },
+            { address: { [Op.iLike]: `%${search}%` } }
+        ];
+    }
+
+    const { count, rows: laboratories } = await Laboratory.findAndCountAll({
+        where: whereClause,
+        include: [{
+            model: User,
+            as: 'user',
+            attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'is_active']
+        }],
+        order: [['createdAt', 'DESC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset)
     });
-  }
-  
-  // Check if laboratory profile exists
-  let existingLaboratory = await Laboratory.findOne({ where: { user_id: userId } });
-  
-  let isFirstTimeCreation = false;
-  let laboratory;
-  let roleChanged = false;
-  
-  if (existingLaboratory) {
-    // Admin updates existing laboratory profile
-    const updateData = {
-      lab_name: lab_name || existingLaboratory.lab_name,
-      license_number: license_number || existingLaboratory.license_number,
-      address: address || existingLaboratory.address
-    };
-    
-    // Only update approval fields if provided
-    if (is_approved !== undefined) {
-      updateData.is_approved = is_approved;
-      updateData.approved_by_admin_id = req.user.id;
-      updateData.approved_at = is_approved ? new Date() : null;
-    }
-    
-    await existingLaboratory.update(updateData);
-    laboratory = existingLaboratory;
-  } else {
-    // Admin creates new laboratory profile for user
-    isFirstTimeCreation = true;
-    const createData = {
-      user_id: userId,
-      lab_name,
-      license_number,
-      address
-    };
-    
-    // Admin can set approval status directly
-    if (is_approved !== undefined) {
-      createData.is_approved = is_approved;
-      createData.approved_by_admin_id = req.user.id;
-      createData.approved_at = is_approved ? new Date() : null;
-    } else {
-      createData.is_approved = false; // Default to unapproved
-    }
-    
-    laboratory = await Laboratory.create(createData);
-    
-    // Admin can also update user role if needed
-    if (user.role === 'user') {
-      await user.update({
-        role: 'laboratory'
-      });
-      roleChanged = true;
-    }
-  }
 
-  // Fetch complete profile
-  const updatedLaboratory = await Laboratory.findOne({
-    where: { id: laboratory.id },
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role']
-      }
-    ]
-  });
+    res.json({
+        success: true,
+        data: laboratories,
+        pagination: {
+            total: count,
+            page: parseInt(page),
+            pages: Math.ceil(count / limit),
+            limit: parseInt(limit)
+        }
+    });
+});
 
-  // Prepare response
-  const response = {
-    success: true,
-    message: isFirstTimeCreation ? 'Laboratory profile created successfully by admin' : 'Laboratory profile updated successfully by admin',
-    data: updatedLaboratory,
-    adminAction: {
-      performedBy: `${req.user.first_name} ${req.user.last_name}`,
-      adminId: req.user.id
+// @desc    Get laboratory by ID
+// @route   GET /api/admin/laboratories/:id
+// @access  Private/Admin
+exports.getLaboratoryById = asyncHandler(async (req, res) => {
+    const laboratory = await Laboratory.findByPk(req.params.id, {
+        include: [
+            {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'country', 'avatar']
+            },
+            {
+                model: LabTest,
+                as: 'tests',
+                limit: 10,
+                order: [['ordered_date', 'DESC']]
+            }
+        ]
+    });
+
+    if (!laboratory) {
+        res.status(404);
+        throw new Error('Laboratory not found');
     }
-  };
-  
-  if (roleChanged) {
-    response.message += ' (role updated to laboratory)';
-  }
-  
-  if (laboratory.is_approved) {
-    response.note = 'Laboratory profile is approved and active';
-  } else {
-    response.note = 'Laboratory profile is pending approval';
-  }
 
-  res.status(200).json(response);
+    res.json({
+        success: true,
+        data: laboratory
+    });
+});
+
+// @desc    Approve laboratory
+// @route   PUT /api/admin/laboratories/:id/approve
+// @access  Private/Admin
+exports.approveLaboratory = asyncHandler(async (req, res) => {
+    const laboratory = await Laboratory.findByPk(req.params.id);
+    
+    if (!laboratory) {
+        res.status(404);
+        throw new Error('Laboratory not found');
+    }
+
+    if (laboratory.is_approved) {
+        res.status(400);
+        throw new Error('Laboratory is already approved');
+    }
+
+    await laboratory.update({
+        is_approved: true,
+        approved_by_admin_id: req.user.id,
+        approved_at: new Date()
+    });
+
+    res.json({
+        success: true,
+        data: laboratory,
+        message: 'Laboratory approved successfully'
+    });
+});
+
+// @desc    Reject laboratory
+// @route   PUT /api/admin/laboratories/:id/reject
+// @access  Private/Admin
+exports.rejectLaboratory = asyncHandler(async (req, res) => {
+    const { reason } = req.body;
+    const laboratory = await Laboratory.findByPk(req.params.id);
+    
+    if (!laboratory) {
+        res.status(404);
+        throw new Error('Laboratory not found');
+    }
+
+    await laboratory.update({
+        is_approved: false,
+        approved_by_admin_id: null,
+        approved_at: null
+    });
+
+    // Here you would typically send a rejection email
+    // await sendRejectionEmail(laboratory.user.email, reason);
+
+    res.json({
+        success: true,
+        message: 'Laboratory rejected successfully'
+    });
+});
+
+// @desc    Delete laboratory
+// @route   DELETE /api/admin/laboratories/:id
+// @access  Private/Admin
+exports.deleteLaboratory = asyncHandler(async (req, res) => {
+    const laboratory = await Laboratory.findByPk(req.params.id);
+    
+    if (!laboratory) {
+        res.status(404);
+        throw new Error('Laboratory not found');
+    }
+
+    await laboratory.destroy();
+    
+    res.json({
+        success: true,
+        message: 'Laboratory deleted successfully'
+    });
 });

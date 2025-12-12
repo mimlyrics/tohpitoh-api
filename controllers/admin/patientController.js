@@ -1,108 +1,126 @@
-
-
 const asyncHandler = require('express-async-handler');
-const {models: {Patient, User, MedicalRecord, Prescription, LabTest}} = require('../../models');
-const { use } = require('passport');
+const { models: { Patient, User, MedicalRecord, Prescription } } = require('../../models');
+const { Op } = require('sequelize');
 
-// Admin update patient profile for any user
-exports.updatePatientProfileByAdmin = asyncHandler(async (req, res) => {
-  console.log("\nAdmin updating patient profile");
-  console.log("Admin user:", req.user);
-  console.log("Request body:", req.body);
-  
-  const {date_of_birth, height, weight, gender, blood_group, genotype,
-         known_allergies, known_diseases, emergency_access_enabled, emergency_access_code} = req.body;
-  
-  const {userId} = req.params;
-  console.log("Target user ID:", userId);
-  console.log("Admin user ID:", req.user.id);
-  
-  // Check if target user exists
-  const user = await User.findByPk(userId);
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      message: 'Target user not found'
-    });
-  }
-  
-  // Check if patient profile already exists
-  let existingPatient = await Patient.findOne({where: {user_id: userId}});
-  
-  let isFirstTimeCreation = false;
-  let patient;
-  let roleChanged = false;
-  
-  if (existingPatient) {
-    // Admin updates existing patient profile
-    await existingPatient.update({
-      date_of_birth: date_of_birth || existingPatient.date_of_birth,
-      gender: gender || existingPatient.gender,
-      blood_group: blood_group || existingPatient.blood_group,
-      genotype: genotype || existingPatient.genotype,
-      known_allergies: known_allergies || existingPatient.known_allergies,
-      known_diseases: known_diseases || existingPatient.known_diseases,
-      emergency_access_enabled: emergency_access_enabled !== undefined 
-        ? emergency_access_enabled 
-        : existingPatient.emergency_access_enabled,
-      emergency_access_code: emergency_access_code || existingPatient.emergency_access_code,
-      height: height || existingPatient.height,
-      weight: weight || existingPatient.weight
-    });
-    patient = existingPatient;
-  } else {
-    // Admin creates new patient profile for user
-    isFirstTimeCreation = true;
-    patient = await Patient.create({
-      user_id: userId,
-      date_of_birth,
-      gender,
-      blood_group,
-      genotype,
-      known_allergies,
-      known_diseases,
-      emergency_access_enabled,
-      emergency_access_code,
-      height,
-      weight
-    });
-    
-    // Admin can also update user role if needed
-    if (user.role === 'user') {
-      await user.update({
-        role: 'patient'
-      });
-      roleChanged = true;
+// @desc    Get all patients
+// @route   GET /api/admin/patients
+// @access  Private/Admin
+exports.getAllPatients = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 20, search } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {};
+    if (search) {
+        whereClause[Op.or] = [
+            { gender: { [Op.iLike]: `%${search}%` } },
+            { blood_type: { [Op.iLike]: `%${search}%` } }
+        ];
     }
-  }
 
-  // Fetch complete profile
-  const updatedPatient = await Patient.findOne({
-    where: {id: patient.id},
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'role']
-      }
-    ]
-  });
+    const { count, rows: patients } = await Patient.findAndCountAll({
+        where: whereClause,
+        include: [{
+            model: User,
+            as: 'user',
+            attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+        }],
+        order: [['createdAt', 'DESC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+    });
 
-  // Prepare response
-  const response = {
-    success: true,
-    message: isFirstTimeCreation ? 'Patient profile created successfully by admin' : 'Patient profile updated successfully by admin',
-    data: updatedPatient,
-    adminAction: {
-      performedBy: `${req.user.first_name} ${req.user.last_name}`,
-      adminId: req.user.id
-    }
-  };
-  
-  if (roleChanged) {
-    response.message += ' (role updated to patient)';
-  }
-
-  res.status(200).json(response);
+    res.json({
+        success: true,
+        data: patients,
+        pagination: {
+            total: count,
+            page: parseInt(page),
+            pages: Math.ceil(count / limit),
+            limit: parseInt(limit)
+        }
+    });
 });
 
+// @desc    Get patient by ID
+// @route   GET /api/admin/patients/:id
+// @access  Private/Admin
+exports.getPatientById = asyncHandler(async (req, res) => {
+    const patient = await Patient.findByPk(req.params.id, {
+        include: [
+            {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'country', 'avatar']
+            },
+            {
+                model: MedicalRecord,
+                as: 'medicalRecords',
+                limit: 10,
+                order: [['date', 'DESC']]
+            },
+            {
+                model: Prescription,
+                as: 'prescriptions',
+                limit: 10,
+                order: [['prescribed_date', 'DESC']]
+            }
+        ]
+    });
+
+    if (!patient) {
+        res.status(404);
+        throw new Error('Patient not found');
+    }
+
+    res.json({
+        success: true,
+        data: patient
+    });
+});
+
+// @desc    Update patient
+// @route   PUT /api/admin/patients/:id
+// @access  Private/Admin
+exports.updatePatient = asyncHandler(async (req, res) => {
+    const patient = await Patient.findByPk(req.params.id);
+    
+    if (!patient) {
+        res.status(404);
+        throw new Error('Patient not found');
+    }
+
+    const updateData = req.body;
+    
+    // Remove fields that shouldn't be updated directly
+    delete updateData.id;
+    delete updateData.user_id;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
+
+    await patient.update(updateData);
+
+    res.json({
+        success: true,
+        data: patient,
+        message: 'Patient updated successfully'
+    });
+});
+
+// @desc    Delete patient
+// @route   DELETE /api/admin/patients/:id
+// @access  Private/Admin
+exports.deletePatient = asyncHandler(async (req, res) => {
+    const patient = await Patient.findByPk(req.params.id);
+    
+    if (!patient) {
+        res.status(404);
+        throw new Error('Patient not found');
+    }
+
+    await patient.destroy();
+    
+    res.json({
+        success: true,
+        message: 'Patient deleted successfully'
+    });
+});

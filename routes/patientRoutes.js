@@ -12,8 +12,6 @@ router.use(authenticate);
 router.get('/profile', authorize(['patient', 'admin']), patientController.getPatientProfile);
 router.get('/profile/:userId', authorize(['admin']), patientController.getPatientProfile); // Admin can view any profile
 router.put('/profile/me', authorize(['patient', 'user']), patientController.updateMyPatientProfile); // Self-update
-router.put('/profile/:userId', authorize(['admin']), adminPatientController.updatePatientProfileByAdmin); // Admin update any user
-
 
 router.get('/medical-records', authorize(['patient', 'admin']), patientController.getMedicalRecord);
 router.put('/emergency-access', authorize('patient'), patientController.configureEmergencyAccess);
