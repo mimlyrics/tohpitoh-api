@@ -9,24 +9,37 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 
 const app = express();
+// Add near the top with other requires
 
 const db = require('./config/db');
 const sequelize = require('./sequelize');
 
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./swaggerConfig');
+const path = require('path');
 
+// Try to load generated swagger.json
+let swaggerDocument;
+try {
+  swaggerDocument = require('./swagger.json');
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  console.log('📚 Swagger UI available at: http://localhost:5000/api-docs');
+} catch (error) {
+  console.log('⚠️  swagger.json not found. Run: node generate-docs.js');
+}
 
-// Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Optional: Serve swagger spec as JSON
-app.get('/api-docs.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
+// Serve HTML documentation
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/api-docs.html'));
 });
 
-// ... r
+// Serve raw JSON spec
+app.get('/api-docs.json', (req, res) => {
+  if (swaggerDocument) {
+    res.json(swaggerDocument);
+  } else {
+    res.status(404).json({ error: 'Documentation not generated. Run node generate-docs.js' });
+  }
+});
 
 // Middleware
 app.use(cookieParser());
@@ -139,6 +152,8 @@ const { createAdmin, seedDatabase } = require('./db/init');
 
 app.use(notFound);
 app.use(errorHandler);
+
+
 
 // Start server
 const port = process.env.PORT || 5175;
