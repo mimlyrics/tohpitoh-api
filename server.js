@@ -56,11 +56,15 @@ const credentials = require("./middlewares/credentials");
 app.use(credentials);
 
 const corsOptions = {
+  origin: (origin, callback) => {
+    callback(null, true); // allow all origins
+  },
   credentials: true,
-  origin: 'https://mimlyricstest5.onrender.com',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 };
+
 app.use(cors(corsOptions));
+
 
 app.use("/public", express.static("public"));
 app.use(express.urlencoded({ extended: false }));
@@ -100,7 +104,7 @@ const io = new Server(httpServer, {
   cors: {
     credentials: true,
     origin: function(origin, callback) {
-      const allowedOrigins = ['http://localhost:3001'];
+      const allowedOrigins = ['http://localhost:3000'];
       if (!origin || allowedOrigins.indexOf(origin) !== -1) callback(null, true);
       else callback(new Error('Not allowed by CORS'));
     },
