@@ -23,7 +23,7 @@ router.delete('/medical-records/:recordId', authorize('doctor'), medicalRecordCo
 
 router.post('/patients/:patientId/medical-records', 
   authorize('doctor'), 
-  doctorController.addMedicalRecord
+  medicalRecordController.addMedicalRecord
 );
 router.get('/patients/:patientId/medical-records', authorize('doctor'), medicalRecordController.getPatientMedicalRecords);
 router.get('/record-types', authorize(['doctor', 'admin']), medicalRecordController.getRecordTypes);
