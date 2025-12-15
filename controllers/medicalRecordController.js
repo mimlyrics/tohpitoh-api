@@ -394,6 +394,7 @@ exports.searchMedicalRecords = asyncHandler(async (req, res) => {
     data: records
   });
 });
+
 // Get medical record statistics
 exports.getMedicalRecordStats = asyncHandler(async (req, res) => {
   console.log("\nGetting medical record statistics");
@@ -416,24 +417,65 @@ exports.getMedicalRecordStats = asyncHandler(async (req, res) => {
     }
   }
   
+  // Check what column name is actually in your database
+  // Based on your previous errors, it's likely 'createdAt' (camelCase)
   const totalRecords = await MedicalRecord.count({ where: whereClause });
   
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  // Use 'createdAt' (default Sequelize) or check your model for actual column name
+  // IMPORTANT: Check which column name to use
+  // Try 'createdAt' first (most likely based on your database)
   const recentRecords = await MedicalRecord.count({
-    where: { ...whereClause, createdAt: { [Op.gte]: thirtyDaysAgo } }
-    // OR if your model uses 'created_at':
-    // where: { ...whereClause, created_at: { [Op.gte]: thirtyDaysAgo } }
+    where: { 
+      ...whereClause, 
+      createdAt: { [Op.gte]: thirtyDaysAgo }  // Changed to 'createdAt'
+    }
   });
+  
+  // Also get today's count
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const todayCount = await MedicalRecord.count({
+    where: { 
+      ...whereClause,
+      createdAt: { [Op.gte]: today }  // Changed to 'createdAt'
+    }
+  });
+  
+  // Get counts by record type
+  const recordTypeStats = await MedicalRecord.findAll({
+    where: whereClause,
+    attributes: [
+      'record_type',
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+    ],
+    group: ['record_type']
+  });
+  
+  // Get unique patients (for doctors only)
+  let uniquePatients = 0;
+  if (req.user.role === 'doctor') {
+    const patientRecords = await MedicalRecord.findAll({
+      where: whereClause,
+      attributes: ['patient_id'],
+      group: ['patient_id']
+    });
+    uniquePatients = patientRecords.length;
+  }
   
   res.status(200).json({
     success: true,
-    data: { totalRecords, recentRecords }
+    data: { 
+      totalRecords, 
+      recentRecords,
+      todayCount,
+      recordTypeStats,
+      uniquePatients
+    }
   });
 });
-
 // Get record types
 exports.getRecordTypes = asyncHandler(async (req, res) => {
   const recordTypes = [
