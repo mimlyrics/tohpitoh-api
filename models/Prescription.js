@@ -30,12 +30,15 @@ module.exports = (sequelize) => {
         },
         dosage: {
             type: DataTypes.STRING(100),
+            allowNUll: true
         },
         frequency: {
-            type: DataTypes.STRING(100)
+            type: DataTypes.STRING(100),
+            allowNUll: true
         },
         duration: {
-            type: DataTypes.STRING(50)
+            type: DataTypes.STRING(50),
+            allowNUll: true
         },
         prescribed_date: {
             type: DataTypes.DATE,

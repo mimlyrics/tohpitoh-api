@@ -200,7 +200,7 @@ exports.getLaboratoryProfileByAdmin = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: laboratory });
 });
 
-// Get all laboratories (for admin dashboard or doctor search)
+// In laboratoryController.js
 exports.getAllLaboratories = asyncHandler(async (req, res) => {
   console.log("\nGetting all laboratories");
   
@@ -233,7 +233,7 @@ exports.getAllLaboratories = asyncHandler(async (req, res) => {
         attributes: ['id', 'first_name', 'last_name']
       }
     ],
-    order: [['created_at', 'DESC']]
+    order: [['createdAt', 'DESC']]  // Changed from created_at to createdAt
   });
   
   res.status(200).json({ success: true, count: laboratories.length, data: laboratories });

@@ -2,11 +2,25 @@ const asyncHandler = require('express-async-handler');
 const { models: { MedicalRecord, Patient, Doctor, User, Laboratory, Prescription } } = require('../models');
 const { Op } = require('sequelize');
 // Add medical record
+// In your backend controller (doctorsController.js or similar):
 exports.addMedicalRecord = asyncHandler(async (req, res) => {
   console.log("\nAdding medical record");
   
   const { patientId } = req.params;
-  const { record_type, laboratory_id, title, description, attachment_url, date, is_shared, shared_until } = req.body;
+  const { 
+    record_type, 
+    laboratory_id, 
+    title, 
+    description, 
+    attachment_url, 
+    date, 
+    is_shared, 
+    shared_until,
+    doctor_id // Add this to handle FormData
+  } = req.body;
+  
+  // Parse laboratory_id as integer if it exists
+  const parsedLabId = laboratory_id ? parseInt(laboratory_id) : null;
   
   const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
   
@@ -23,7 +37,7 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
   }
   
   const medicalRecord = await MedicalRecord.create({
-    laboratory_id: laboratory_id || null,
+    laboratory_id: parsedLabId, // Use parsed integer
     patient_id: patientId,
     doctor_id: doctor.id,
     record_type: record_type || "consultation",
@@ -31,8 +45,8 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     description,
     date: date || new Date(),
     attachment_url,
-    is_shared: is_shared || false,
-    shared_until: is_shared ? shared_until : null
+    is_shared: is_shared === 'true' || is_shared === true, // Handle both string and boolean
+    shared_until: (is_shared === 'true' || is_shared === true) ? shared_until : null
   });
   
   const createdRecord = await MedicalRecord.findOne({
