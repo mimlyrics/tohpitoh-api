@@ -77,7 +77,7 @@ app.use(express.json());
   //const sequelizeInstance = await sequelize; 
   // Load all models BEFORE syncing
   //require("./models/User")(sequelizeInstance);
-  await sequelize.sync({ force: false});
+  await sequelize.sync({ force: true});
   await seedDatabase();
   console.log("All models synced (force: )");
 })();
