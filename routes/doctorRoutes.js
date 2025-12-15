@@ -6,6 +6,12 @@ const { authenticate, authorize } = require('../middlewares/authMiddleware');
 const medicalRecordController = require('../controllers/medicalRecordController');
 const prescriptionController = require('../controllers/prescriptionController');
 const labTestController = require('../controllers/labtestsController');
+
+// In your backend routes
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
+
+
 // All routes require authentication
 router.use(authenticate);
 
@@ -20,7 +26,12 @@ router.get('/medical-records/stats', authorize('doctor'), medicalRecordControlle
 router.get('/medical-records/:recordId', authorize('doctor'), medicalRecordController.getMedicalRecord);
 router.put('/medical-records/:recordId', authorize('doctor'), medicalRecordController.updateMedicalRecord);
 router.delete('/medical-records/:recordId', authorize('doctor'), medicalRecordController.deleteMedicalRecord);
-router.post('/patients/:patientId/medical-records', authorize('doctor'), medicalRecordController.addMedicalRecord);
+
+router.post('/patients/:patientId/medical-records', 
+  authorize('doctor'), 
+  upload.single('attachment'), // Handle file upload if present
+  doctorController.addMedicalRecord
+);
 router.get('/patients/:patientId/medical-records', authorize('doctor'), medicalRecordController.getPatientMedicalRecords);
 router.get('/record-types', authorize(['doctor', 'admin']), medicalRecordController.getRecordTypes);
 

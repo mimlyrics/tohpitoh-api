@@ -42,34 +42,35 @@ router.post('/patients/:patientId/medical-records',
   doctorController.addMedicalRecord
 );
 
-// Then update your controller:
 exports.addMedicalRecord = asyncHandler(async (req, res) => {
-  console.log("\nAdding medical record");
-  console.log("Request body:", req.body);
-  console.log("Request file:", req.file);
-  console.log("Request params:", req.params);
+  console.log("\n=== ADD MEDICAL RECORD ===");
+  console.log("Params:", req.params);
+  console.log("Body:", req.body);
+  console.log("File:", req.file);
+  console.log("User:", req.user);
   
   const { patientId } = req.params;
   const { 
-    record_type, 
-    laboratory_id, 
     title, 
     description, 
+    record_type, 
+    laboratory_id, 
     date, 
-    is_shared, 
-    shared_until 
+    is_shared,
+    doctor_id  // Make sure this comes from the request or use req.user.id
   } = req.body;
   
   // Validate required fields
-  if (!title || !title.trim()) {
+  if (!title) {
     return res.status(400).json({
       success: false,
-      message: 'Title is required'
+      message: 'Title is required',
+      errors: [{ field: 'title', message: 'Title cannot be null' }]
     });
   }
   
+  // Get doctor from user ID
   const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
-  
   if (!doctor || !doctor.is_approved) {
     return res.status(403).json({
       success: false,
@@ -77,51 +78,49 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     });
   }
   
+  // Verify patient exists
   const patient = await Patient.findOne({ where: { id: patientId } });
   if (!patient) {
-    return res.status(404).json({ success: false, message: 'Patient not found' });
+    return res.status(404).json({ 
+      success: false, 
+      message: 'Patient not found' 
+    });
   }
   
-  // Handle file upload
+  // Handle file upload if present
   let attachment_url = null;
   if (req.file) {
-    attachment_url = `/uploads/medical-records/${req.file.filename}`;
+    attachment_url = `/uploads/${req.file.filename}`;
   }
   
-  // Parse laboratory_id as integer if it exists
-  const parsedLabId = laboratory_id ? parseInt(laboratory_id) : null;
-  
-  // Parse is_shared - it might come as string 'true'/'false'
-  const isShared = is_shared === 'true' || is_shared === true;
-  
+  // Create medical record
   const medicalRecord = await MedicalRecord.create({
-    laboratory_id: parsedLabId,
-    patient_id: patientId,
-    doctor_id: doctor.id,
-    record_type: record_type || "consultation",
     title: title.trim(),
     description: description ? description.trim() : null,
+    record_type: record_type || 'consultation',
+    patient_id: patientId,
+    doctor_id: doctor.id,  // Use doctor.id from the database
+    laboratory_id: laboratory_id ? parseInt(laboratory_id) : null,
     date: date || new Date(),
-    attachment_url,
-    is_shared: isShared,
-    shared_until: isShared ? (shared_until || null) : null
+    is_shared: is_shared === 'true' || is_shared === true,
+    attachment_url
   });
   
   const createdRecord = await MedicalRecord.findOne({
     where: { id: medicalRecord.id },
     include: [
-      { model: Patient, as: 'patient' },
-      { model: Doctor, as: 'doctor' }
+      { model: Patient, as: 'patient', include: [{ model: User, as: 'user' }] },
+      { model: Doctor, as: 'doctor' },
+      { model: Laboratory, as: 'laboratory' }
     ]
   });
   
   res.status(201).json({
     success: true,
-    message: 'Medical record added',
+    message: 'Medical record created successfully',
     data: createdRecord
   });
 });
-
 // Get patient medical records
 exports.getPatientMedicalRecords = asyncHandler(async (req, res) => {
   console.log("\nGetting patient medical records");
