@@ -1,7 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const {models: { Doctor, User, Patient, Prescription, MedicalRecord, LabTest, AccessPermission}} = require('../models');
-const { Op } = require('sequelize');
-
+const sequelize = require('../sequelize');
+const {Op} = require('sequelize');
 
 // Update doctor profile for authenticated user (self-update)
 exports.updateMyDoctorProfile = asyncHandler(async (req, res) => {
@@ -716,12 +716,14 @@ exports.getMedicalRecordStats = async (req, res) => {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
+        // FIX: Changed 'createdAt' to correct column name
         const monthlyStats = await MedicalRecord.findAll({
             where: {
                 doctor_id: doctorId,
-                created_at: { [Op.gte]: sixMonthsAgo }
+                createdAt: { [Op.gte]: sixMonthsAgo } // Changed from created_at to createdAt
             },
             attributes: [
+                // Use the exact column name from your database
                 [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'month'],
                 [sequelize.fn('COUNT', sequelize.col('id')), 'count']
             ],
@@ -733,19 +735,22 @@ exports.getMedicalRecordStats = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
+        // FIX: Changed 'created_at' to 'createdAt'
         const todayCount = await MedicalRecord.count({
             where: {
                 doctor_id: doctorId,
-                created_at: { [Op.gte]: today }
+                createdAt: { [Op.gte]: today } // Changed from created_at to createdAt
             }
         });
 
-        // Get patient count
-        const patientCount = await MedicalRecord.count({
+        // Get patient count - Fixed this query
+        const patientRecords = await MedicalRecord.findAll({
             where: { doctor_id: doctorId },
             attributes: ['patient_id'],
             group: ['patient_id']
         });
+        
+        const uniquePatientCount = patientRecords.length;
 
         res.status(200).json({
             success: true,
@@ -754,7 +759,7 @@ exports.getMedicalRecordStats = async (req, res) => {
                 record_type_stats: recordTypeStats,
                 monthly_stats: monthlyStats,
                 today_count: todayCount,
-                unique_patients: patientCount.length
+                unique_patients: uniquePatientCount
             }
         });
 
@@ -767,7 +772,6 @@ exports.getMedicalRecordStats = async (req, res) => {
         });
     }
 };
-
 /**
  * Get doctor's prescription statistics
  */
