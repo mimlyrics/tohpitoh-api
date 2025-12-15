@@ -1,10 +1,53 @@
 const asyncHandler = require('express-async-handler');
 const { models: { MedicalRecord, Patient, Doctor, User, Laboratory, Prescription } } = require('../models');
 const { Op } = require('sequelize');
-// Add medical record
-// In your backend controller (doctorsController.js or similar):
+
+// First, add multer middleware for file uploads
+const multer = require('multer');
+const path = require('path');
+
+// Configure storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/medical-records/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, `medical-record-${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+
+// File filter
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only images, PDFs, and Word documents are allowed'));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: fileFilter
+});
+
+// Update your route to use multer
+router.post('/patients/:patientId/medical-records', 
+  authorize('doctor'), 
+  upload.single('attachment'), // Handle single file upload
+  doctorController.addMedicalRecord
+);
+
+// Then update your controller:
 exports.addMedicalRecord = asyncHandler(async (req, res) => {
   console.log("\nAdding medical record");
+  console.log("Request body:", req.body);
+  console.log("Request file:", req.file);
+  console.log("Request params:", req.params);
   
   const { patientId } = req.params;
   const { 
@@ -12,15 +55,18 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     laboratory_id, 
     title, 
     description, 
-    attachment_url, 
     date, 
     is_shared, 
-    shared_until,
-    doctor_id // Add this to handle FormData
+    shared_until 
   } = req.body;
   
-  // Parse laboratory_id as integer if it exists
-  const parsedLabId = laboratory_id ? parseInt(laboratory_id) : null;
+  // Validate required fields
+  if (!title || !title.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Title is required'
+    });
+  }
   
   const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
   
@@ -36,17 +82,29 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Patient not found' });
   }
   
+  // Handle file upload
+  let attachment_url = null;
+  if (req.file) {
+    attachment_url = `/uploads/medical-records/${req.file.filename}`;
+  }
+  
+  // Parse laboratory_id as integer if it exists
+  const parsedLabId = laboratory_id ? parseInt(laboratory_id) : null;
+  
+  // Parse is_shared - it might come as string 'true'/'false'
+  const isShared = is_shared === 'true' || is_shared === true;
+  
   const medicalRecord = await MedicalRecord.create({
-    laboratory_id: parsedLabId, // Use parsed integer
+    laboratory_id: parsedLabId,
     patient_id: patientId,
     doctor_id: doctor.id,
     record_type: record_type || "consultation",
-    title,
-    description,
+    title: title.trim(),
+    description: description ? description.trim() : null,
     date: date || new Date(),
     attachment_url,
-    is_shared: is_shared === 'true' || is_shared === true, // Handle both string and boolean
-    shared_until: (is_shared === 'true' || is_shared === true) ? shared_until : null
+    is_shared: isShared,
+    shared_until: isShared ? (shared_until || null) : null
   });
   
   const createdRecord = await MedicalRecord.findOne({
