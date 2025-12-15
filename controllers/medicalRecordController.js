@@ -2,51 +2,10 @@ const asyncHandler = require('express-async-handler');
 const { models: { MedicalRecord, Patient, Doctor, User, Laboratory, Prescription } } = require('../models');
 const { Op } = require('sequelize');
 
-// First, add multer middleware for file uploads
-const multer = require('multer');
-const path = require('path');
-
-// Configure storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/medical-records/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, `medical-record-${Date.now()}${path.extname(file.originalname)}`);
-  }
-});
-
-// File filter
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error('Only images, PDFs, and Word documents are allowed'));
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: fileFilter
-});
-
-// Update your route to use multer
-router.post('/patients/:patientId/medical-records', 
-  authorize('doctor'), 
-  upload.single('attachment'), // Handle single file upload
-  doctorController.addMedicalRecord
-);
-
 exports.addMedicalRecord = asyncHandler(async (req, res) => {
   console.log("\n=== ADD MEDICAL RECORD ===");
   console.log("Params:", req.params);
   console.log("Body:", req.body);
-  console.log("File:", req.file);
   console.log("User:", req.user);
   
   const { patientId } = req.params;
@@ -60,15 +19,7 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     doctor_id  // Make sure this comes from the request or use req.user.id
   } = req.body;
   
-  // Validate required fields
-  if (!title) {
-    return res.status(400).json({
-      success: false,
-      message: 'Title is required',
-      errors: [{ field: 'title', message: 'Title cannot be null' }]
-    });
-  }
-  
+
   // Get doctor from user ID
   const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
   if (!doctor || !doctor.is_approved) {
@@ -87,10 +38,12 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     });
   }
   
-  // Handle file upload if present
-  let attachment_url = null;
-  if (req.file) {
-    attachment_url = `/uploads/${req.file.filename}`;
+  // Validate required fields
+  if (!title || !title.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Title is required'
+    });
   }
   
   // Create medical record
@@ -103,7 +56,7 @@ exports.addMedicalRecord = asyncHandler(async (req, res) => {
     laboratory_id: laboratory_id ? parseInt(laboratory_id) : null,
     date: date || new Date(),
     is_shared: is_shared === 'true' || is_shared === true,
-    attachment_url
+    attachment_url: null  // No file uploads
   });
   
   const createdRecord = await MedicalRecord.findOne({
