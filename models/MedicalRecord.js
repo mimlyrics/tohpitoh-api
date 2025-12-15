@@ -17,7 +17,7 @@ module.exports = (sequelize) => {
             }
         },
         record_type: {
-            type: DataTypes.ENUM('vaccination', 'prescription', 'diagonosis', 'consultation', 'other'),
+            type: DataTypes.ENUM('vaccination', 'prescription', 'diagnosis', 'consultation', 'other'),
             allowNull: false
         },
 

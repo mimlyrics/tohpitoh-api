@@ -936,3 +936,212 @@ exports.getPrescriptionStats = async (req, res) => {
         });
     }
 };
+
+// Get all patients for a doctor
+exports.getPatients = asyncHandler(async (req, res) => {
+  console.log("\nGetting all patients for doctor");
+  
+  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
+  if (!doctor || !doctor.is_approved) {
+    return res.status(403).json({
+      success: false,
+      message: 'Doctor not found or not approved'
+    });
+  }
+  
+  // Find patients who have medical records from this doctor
+  const patients = await Patient.findAll({
+    include: [
+      {
+        model: User,
+        as: 'user',
+        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+      }
+    ],
+    order: [[{ model: User, as: 'user' }, 'first_name', 'ASC']]
+  });
+  
+  // For each patient, add their latest medical record from this doctor
+  const patientsWithRecords = await Promise.all(
+    patients.map(async (patient) => {
+      const patientData = patient.toJSON();
+      
+      // Get last medical record from this doctor for this patient
+      const lastRecord = await MedicalRecord.findOne({
+        where: {
+          patient_id: patient.id,
+          doctor_id: doctor.id
+        },
+        order: [['date', 'DESC']],
+        attributes: ['id', 'title', 'record_type', 'date', 'created_at']
+      });
+      
+      patientData.last_record = lastRecord;
+      return patientData;
+    })
+  );
+  
+  res.status(200).json({
+    success: true,
+    count: patientsWithRecords.length,
+    data: patientsWithRecords
+  });
+});
+
+// Get medical records created by the doctor
+exports.getDoctorMedicalRecords = asyncHandler(async (req, res) => {
+  console.log("\nGetting doctor's medical records");
+  
+  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
+  if (!doctor || !doctor.is_approved) {
+    return res.status(403).json({
+      success: false,
+      message: 'Doctor not found or not approved'
+    });
+  }
+  
+  const { page = 1, limit = 20 } = req.query;
+  const offset = (page - 1) * limit;
+  
+  const { count, rows: records } = await MedicalRecord.findAndCountAll({
+    where: { doctor_id: doctor.id },
+    include: [
+      {
+        model: Patient,
+        as: 'patient',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name', 'email']
+        }]
+      },
+      {
+        model: Doctor,
+        as: 'doctor',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name']
+        }]
+      }
+    ],
+    order: [['date', 'DESC'], ['created_at', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset)
+  });
+  
+  res.status(200).json({
+    success: true,
+    count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: parseInt(page),
+    data: records
+  });
+});
+
+// Get prescriptions created by the doctor
+exports.getDoctorPrescriptions = asyncHandler(async (req, res) => {
+  console.log("\nGetting doctor's prescriptions");
+  
+  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
+  if (!doctor || !doctor.is_approved) {
+    return res.status(403).json({
+      success: false,
+      message: 'Doctor not found or not approved'
+    });
+  }
+  
+  const { page = 1, limit = 20 } = req.query;
+  const offset = (page - 1) * limit;
+  
+  const { count, rows: prescriptions } = await Prescription.findAndCountAll({
+    where: { doctor_id: doctor.id },
+    include: [
+      {
+        model: Patient,
+        as: 'patient',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name', 'email']
+        }]
+      },
+      {
+        model: Doctor,
+        as: 'doctor',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name']
+        }]
+      }
+    ],
+    order: [['prescribed_date', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset)
+  });
+  
+  res.status(200).json({
+    success: true,
+    count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: parseInt(page),
+    data: prescriptions
+  });
+});
+
+// Get lab tests created by the doctor
+exports.getDoctorLabTests = asyncHandler(async (req, res) => {
+  console.log("\nGetting doctor's lab tests");
+  
+  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
+  if (!doctor || !doctor.is_approved) {
+    return res.status(403).json({
+      success: false,
+      message: 'Doctor not found or not approved'
+    });
+  }
+  
+  const { page = 1, limit = 20 } = req.query;
+  const offset = (page - 1) * limit;
+  
+  const { count, rows: labTests } = await LabTest.findAndCountAll({
+    where: { doctor_id: doctor.id },
+    include: [
+      {
+        model: Patient,
+        as: 'patient',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name', 'email']
+        }]
+      },
+      {
+        model: Doctor,
+        as: 'doctor',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name']
+        }]
+      },
+      {
+        model: Laboratory,
+        as: 'laboratory',
+        attributes: ['id', 'name', 'address', 'phone']
+      }
+    ],
+    order: [['ordered_date', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset)
+  });
+  
+  res.status(200).json({
+    success: true,
+    count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: parseInt(page),
+    data: labTests
+  });
+});
