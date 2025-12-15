@@ -552,7 +552,10 @@ exports.getMyPatients = async (req, res) => {
 exports.getPatients = asyncHandler(async (req, res) => {
   console.log("\nGetting all patients for doctor");
   
-  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
+  const doctor = await Doctor.findOne({ 
+    where: { user_id: req.user.id } 
+  });
+  
   if (!doctor || !doctor.is_approved) {
     return res.status(403).json({
       success: false,
@@ -560,46 +563,55 @@ exports.getPatients = asyncHandler(async (req, res) => {
     });
   }
   
-  // Find patients who have medical records from this doctor
-  const patients = await Patient.findAll({
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
-      }
-    ],
-    // FIXED: Changed 'created_at' to 'createdAt' or remove ordering
-    order: [[{ model: User, as: 'user' }, 'first_name', 'ASC']]
-  });
-  
-  // For each patient, add their latest medical record from this doctor
-  const patientsWithRecords = await Promise.all(
-    patients.map(async (patient) => {
-      const patientData = patient.toJSON();
-      
-      // Get last medical record from this doctor for this patient
-      const lastRecord = await MedicalRecord.findOne({
-        where: {
-          patient_id: patient.id,
-          doctor_id: doctor.id
-        },
-        order: [['date', 'DESC']],
-        attributes: ['id', 'title', 'record_type', 'date', 'createdAt'] // Fixed here too
-      });
-      
-      patientData.last_record = lastRecord;
-      return patientData;
-    })
-  );
-  
-  res.status(200).json({
-    success: true,
-    count: patientsWithRecords.length,
-    data: patientsWithRecords
-  });
+  try {
+    // Find patients
+    const patients = await Patient.findAll({
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+        }
+      ],
+      // Use camelCase for createdAt since that's what's in your DB
+      order: [['createdAt', 'DESC']]  // Or remove this if not needed
+    });
+    
+    // For each patient, add their latest medical record from this doctor
+    const patientsWithRecords = await Promise.all(
+      patients.map(async (patient) => {
+        const patientData = patient.toJSON();
+        
+        // Get last medical record from this doctor for this patient
+        const lastRecord = await MedicalRecord.findOne({
+          where: {
+            patient_id: patient.id,
+            doctor_id: doctor.id
+          },
+          order: [['date', 'DESC']],
+          attributes: ['id', 'title', 'record_type', 'date', 'createdAt']
+        });
+        
+        patientData.last_record = lastRecord;
+        return patientData;
+      })
+    );
+    
+    res.status(200).json({
+      success: true,
+      count: patientsWithRecords.length,
+      data: patientsWithRecords
+    });
+    
+  } catch (error) {
+    console.error('Error fetching patients:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      error: error.stack
+    });
+  }
 });
-
 /**
  * Search patients for a doctor
  */
