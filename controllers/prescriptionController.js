@@ -6,6 +6,7 @@ exports.createPrescription = asyncHandler(async (req, res) => {
   console.log("\nCreating prescription");
   
   const { patient_id, medication_name, dosage, frequency, duration, instructions, end_date } = req.body;
+  console.log(req.body);
   
   const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
   
