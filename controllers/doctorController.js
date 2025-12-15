@@ -178,7 +178,7 @@ exports.getAllDoctors = asyncHandler(async (req, res) => {
         attributes: ['id', 'first_name', 'last_name']
       }
     ],
-    order: [['created_at', 'DESC']]
+    order: [['createdAt', 'DESC']]
   });
   
   res.status(200).json({
@@ -311,7 +311,7 @@ exports.getAllDoctors = async (req, res) => {
             where,
             limit: parseInt(limit),
             offset: parseInt(offset),
-            order: [['created_at', 'DESC']],
+            order: [['createdAt', 'DESC']],
             include: [{
                 model: User,
                 as: 'user',
@@ -496,7 +496,7 @@ exports.getMyPatients = async (req, res) => {
                 order = [[{ model: User, as: 'user' }, 'first_name', 'DESC']];
                 break;
             case 'recent':
-                order = [[{ model: User, as: 'user' }, 'created_at', 'DESC']];
+                order = [[{ model: User, as: 'user' }, 'createdAt', 'DESC']];
                 break;
             default:
                 order = [[{ model: User, as: 'user' }, 'first_name', 'ASC']];
@@ -722,11 +722,11 @@ exports.getMedicalRecordStats = async (req, res) => {
                 created_at: { [Op.gte]: sixMonthsAgo }
             },
             attributes: [
-                [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('created_at')), 'month'],
+                [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'month'],
                 [sequelize.fn('COUNT', sequelize.col('id')), 'count']
             ],
-            group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('created_at'))],
-            order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('created_at')), 'ASC']]
+            group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt'))],
+            order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'ASC']]
         });
 
         // Get today's count
@@ -877,7 +877,7 @@ exports.getPatients = asyncHandler(async (req, res) => {
           doctor_id: doctor.id
         },
         order: [['date', 'DESC']],
-        attributes: ['id', 'title', 'record_type', 'date', 'created_at']
+        attributes: ['id', 'title', 'record_type', 'date', 'createdAt']
       });
       
       patientData.last_record = lastRecord;
@@ -929,7 +929,7 @@ exports.getDoctorMedicalRecords = asyncHandler(async (req, res) => {
         }]
       }
     ],
-    order: [['date', 'DESC'], ['created_at', 'DESC']],
+    order: [['date', 'DESC'], ['createdAt', 'DESC']],
     limit: parseInt(limit),
     offset: parseInt(offset)
   });
