@@ -19,7 +19,7 @@ async function seedDatabase() {
         usersData.push({
             first_name: `UserFirst${i}`,
             last_name: `UserLast${i}`,
-            email: `user${i}@example.com`,
+            email: `user${i}@gmail.com`,
             password: `password${i}`,
             phone: `9000000${i.toString().padStart(2, '0')}`,
             country: `Country${i}`,
@@ -32,7 +32,7 @@ async function seedDatabase() {
         usersData.push({
             first_name: `DoctorFirst${i}`,
             last_name: `DoctorLast${i}`,
-            email: `doctor${i}@example.com`,
+            email: `doctor${i}@gmail.com`,
             password: `doctorpass${i}`,
             phone: `9200000${i.toString().padStart(2, '0')}`,
             country: `DoctorCountry${i}`,
@@ -45,7 +45,7 @@ async function seedDatabase() {
         usersData.push({
             first_name: `LabFirst${i}`,
             last_name: `LabLast${i}`,
-            email: `lab${i}@example.com`,
+            email: `lab${i}@gmail.com`,
             password: `labpass${i}`,
             phone: `9300000${i.toString().padStart(2, '0')}`,
             country: `LabCountry${i}`,
