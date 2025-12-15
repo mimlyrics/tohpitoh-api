@@ -44,4 +44,15 @@ router.put('/laboratories/:id/reject', authorize('admin'), adminLaboratoryContro
 router.delete('/laboratories/:id', authorize('admin'), adminLaboratoryController.deleteLaboratory);
 
 
+// Medical Records Management
+router.get('/medical-records', authorize('admin'), adminController.getAllMedicalRecords);
+
+
+// Prescriptions Management
+router.get('/prescriptions', authorize('admin'), adminController.getAllPrescriptions);
+
+
+// Lab Tests Management
+router.get('/lab-tests', authorize('admin'), adminController.getAllLabTests);
+
 module.exports = router;

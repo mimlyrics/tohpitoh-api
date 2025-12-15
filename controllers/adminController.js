@@ -299,3 +299,303 @@ exports.validateAccessRequests = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * Get all medical records for admin
+ */
+exports.getAllMedicalRecords = async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 20,
+            search = '',
+            record_type = '',
+            start_date,
+            end_date,
+            is_shared
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // Build where clause
+        const where = {};
+        
+        if (search) {
+            where[Op.or] = [
+                { title: { [Op.iLike]: `%${search}%` } },
+                { description: { [Op.iLike]: `%${search}%` } }
+            ];
+        }
+        
+        if (record_type) {
+            where.record_type = record_type;
+        }
+        
+        if (start_date || end_date) {
+            where.date = {};
+            if (start_date) where.date[Op.gte] = start_date;
+            if (end_date) where.date[Op.lte] = end_date;
+        }
+        
+        if (is_shared !== undefined) {
+            where.is_shared = is_shared === 'true';
+        }
+
+        // Get total count
+        const total = await MedicalRecord.count({ 
+            where,
+            paranoid: false // Include soft-deleted records
+        });
+
+        // Get records with patient and doctor info
+        const records = await MedicalRecord.findAll({
+            where,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [['created_at', 'DESC']],
+            paranoid: false, // Include soft-deleted records
+            include: [
+                {
+                    model: Patient,
+                    as: 'patient',
+                    attributes: ['id', 'date_of_birth', 'blood_type', 'height', 'weight'],
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+                    }]
+                },
+                {
+                    model: User,
+                    as: 'doctor',
+                    attributes: ['id', 'first_name', 'last_name', 'email']
+                },
+                {
+                    model: Laboratory,
+                    as: 'laboratory',
+                    attributes: ['id', 'lab_name', 'address']
+                }
+            ]
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                records,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(total / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching medical records:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch medical records',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all prescriptions for admin
+ */
+exports.getAllPrescriptions = async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 20,
+            search = '',
+            is_active,
+            start_date,
+            end_date
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // Build where clause
+        const where = {};
+        
+        if (search) {
+            where[Op.or] = [
+                { medication_name: { [Op.iLike]: `%${search}%` } },
+                { dosage: { [Op.iLike]: `%${search}%` } },
+                { instructions: { [Op.iLike]: `%${search}%` } }
+            ];
+        }
+        
+        if (is_active !== undefined) {
+            where.isActive = is_active === 'true';
+        }
+        
+        if (start_date || end_date) {
+            where.prescribed_date = {};
+            if (start_date) where.prescribed_date[Op.gte] = start_date;
+            if (end_date) where.prescribed_date[Op.lte] = end_date;
+        }
+
+        // Get total count
+        const total = await Prescription.count({ 
+            where,
+            paranoid: false
+        });
+
+        // Get prescriptions with patient and doctor info
+        const prescriptions = await Prescription.findAll({
+            where,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [['prescribed_date', 'DESC']],
+            paranoid: false,
+            include: [
+                {
+                    model: Patient,
+                    as: 'patient',
+                    attributes: ['id'],
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+                    }]
+                },
+                {
+                    model: Doctor,
+                    as: 'doctor',
+                    attributes: ['id', 'specialization'],
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['id', 'first_name', 'last_name', 'email']
+                    }]
+                }
+            ]
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                prescriptions,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(total / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching prescriptions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch prescriptions',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get all lab tests for admin
+ */
+exports.getAllLabTests = async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 20,
+            search = '',
+            status = '',
+            start_date,
+            end_date
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // Build where clause
+        const where = {};
+        
+        if (search) {
+            where[Op.or] = [
+                { test_name: { [Op.iLike]: `%${search}%` } },
+                { results: { [Op.iLike]: `%${search}%` } }
+            ];
+        }
+        
+        if (status) {
+            where.status = status;
+        }
+        
+        if (start_date || end_date) {
+            where.ordered_date = {};
+            if (start_date) where.ordered_date[Op.gte] = start_date;
+            if (end_date) where.ordered_date[Op.lte] = end_date;
+        }
+
+        // Get total count
+        const total = await LabTest.count({ 
+            where,
+            paranoid: false
+        });
+
+        // Get lab tests with patient, doctor, and lab info
+        const labTests = await LabTest.findAll({
+            where,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [['ordered_date', 'DESC']],
+            paranoid: false,
+            include: [
+                {
+                    model: Patient,
+                    as: 'patient',
+                    attributes: ['id'],
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
+                    }]
+                },
+                {
+                    model: Doctor,
+                    as: 'doctor',
+                    attributes: ['id', 'specialization'],
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['id', 'first_name', 'last_name', 'email']
+                    }]
+                },
+                {
+                    model: Laboratory,
+                    as: 'laboratory',
+                    attributes: ['id', 'lab_name', 'address', 'phone']
+                }
+            ]
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                labTests,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    pages: Math.ceil(total / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching lab tests:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch lab tests',
+            error: error.message
+        });
+    }
+};

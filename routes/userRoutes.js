@@ -29,32 +29,11 @@ const upload = multer({ storage, fileFilter });
 router.post("/jwt/auth", auth);
 router.post("/jwt/logout", logout);
 router.post("/jwt/register", register);
-router.post("/jwt/verifyEmailCode", getEmailCode);
-router.post("/jwt/verifyEmailCode/:token", verifyEmailCode);
 
 // Admin only routes
 router.post("/jwt/admin/create", protectAdmin, adminCreateUser);
 router.route("/jwt/role/:id").put(protectAdmin, EditRole);
 router.route("/jwt/delete/:userId").delete(protectAdmin, deleteUser);
 
-// Profile routes
-router.route("/jwt/profile")
-  .get(protectAdmin, getUsersProfile)
-  .put(protect, updateUserProfile);
-
-router.route("/jwt/profile/:userId")
-  .get(protectAdmin, getUser)
-  .put(protectAdmin, upload.single("avatar"), AdminUpdateUser);
-
-router.get("/jwt/profile/search/:searchId", protectAdmin, searchProfile);
-
-// Avatar routes
-router.route("/upload/avatar/:userId")
-  .put(upload.single("avatar"), postAvatar)
-  .get(getAvatar)
-  .delete(deleteAvatar);
-
-// Protection test routes (if needed for development)
-router.get("/jwt/protectAdmin", protectAdmin);
 
 module.exports = router;
