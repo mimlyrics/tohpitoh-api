@@ -841,56 +841,7 @@ exports.getPrescriptionStats = async (req, res) => {
     }
 };
 
-// Get all patients for a doctor
-exports.getPatients = asyncHandler(async (req, res) => {
-  console.log("\nGetting all patients for doctor");
-  
-  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
-  if (!doctor || !doctor.is_approved) {
-    return res.status(403).json({
-      success: false,
-      message: 'Doctor not found or not approved'
-    });
-  }
-  
-  // Find patients who have medical records from this doctor
-  const patients = await Patient.findAll({
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
-      }
-    ],
-    order: [[{ model: User, as: 'user' }, 'first_name', 'ASC']]
-  });
-  
-  // For each patient, add their latest medical record from this doctor
-  const patientsWithRecords = await Promise.all(
-    patients.map(async (patient) => {
-      const patientData = patient.toJSON();
-      
-      // Get last medical record from this doctor for this patient
-      const lastRecord = await MedicalRecord.findOne({
-        where: {
-          patient_id: patient.id,
-          doctor_id: doctor.id
-        },
-        order: [['date', 'DESC']],
-        attributes: ['id', 'title', 'record_type', 'date', 'createdAt']
-      });
-      
-      patientData.last_record = lastRecord;
-      return patientData;
-    })
-  );
-  
-  res.status(200).json({
-    success: true,
-    count: patientsWithRecords.length,
-    data: patientsWithRecords
-  });
-});
+
 
 // Get medical records created by the doctor
 exports.getDoctorMedicalRecords = asyncHandler(async (req, res) => {
