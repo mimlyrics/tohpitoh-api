@@ -47,7 +47,7 @@ router.put('/lab-tests/:testId/cancel', authorize('doctor'), labTestController.c
 router.get('/', authorize(['admin', 'patient']), doctorController.getAllDoctors);
 
 // Patient Management (doctor-specific)
-router.get('/patients', authorize('doctor'), doctorController.getPatients);
+router.get('/patients', authorize(['doctor', 'admin']), doctorController.getPatients);
 router.get('/patients/search', authorize('doctor'), doctorController.searchPatients);
 router.get('/patients/:patientId', authorize('doctor'), doctorController.getPatientById);
 

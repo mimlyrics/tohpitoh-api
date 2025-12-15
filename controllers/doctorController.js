@@ -556,9 +556,9 @@ exports.getPatients = async (req, res) => {
     try {
         const doctorId = req.user.id;
         
-        // Check if doctor is approved
+        // Check if doctor is approved - UPDATED to use is_approved
         const doctor = await Doctor.findOne({ where: { user_id: doctorId } });
-        if (!doctor || !doctor.is_verified) {
+        if (!doctor || !doctor.is_approved) {  // Changed from is_verified to is_approved
             return res.status(403).json({
                 success: false,
                 message: 'You must be an approved doctor to access patients'
@@ -708,7 +708,6 @@ exports.getPatients = async (req, res) => {
     }
 };
 
-
 /**
  * Search patients for a doctor
  */
@@ -716,6 +715,15 @@ exports.searchPatients = async (req, res) => {
     try {
         const doctorId = req.user.id;
         const { q } = req.query;
+        
+        // Check if doctor is approved
+        const doctor = await Doctor.findOne({ where: { user_id: doctorId } });
+        if (!doctor || !doctor.is_approved) {
+            return res.status(403).json({
+                success: false,
+                message: 'You must be an approved doctor to search patients'
+            });
+        }
         
         if (!q || q.trim().length < 2) {
             return res.status(400).json({
@@ -780,6 +788,15 @@ exports.searchPatients = async (req, res) => {
 exports.getMedicalRecordStats = async (req, res) => {
     try {
         const doctorId = req.user.id;
+        
+        // Check if doctor is approved
+        const doctor = await Doctor.findOne({ where: { user_id: doctorId } });
+        if (!doctor || !doctor.is_approved) {
+            return res.status(403).json({
+                success: false,
+                message: 'You must be an approved doctor to view statistics'
+            });
+        }
         
         // Get counts by record type
         const recordTypeStats = await MedicalRecord.findAll({
@@ -853,6 +870,15 @@ exports.getMedicalRecordStats = async (req, res) => {
 exports.getPrescriptionStats = async (req, res) => {
     try {
         const doctorId = req.user.id;
+        
+        // Check if doctor is approved
+        const doctor = await Doctor.findOne({ where: { user_id: doctorId } });
+        if (!doctor || !doctor.is_approved) {
+            return res.status(403).json({
+                success: false,
+                message: 'You must be an approved doctor to view prescription statistics'
+            });
+        }
         
         // Get total active prescriptions
         const activePrescriptions = await Prescription.count({
