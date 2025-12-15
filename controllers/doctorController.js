@@ -549,56 +549,164 @@ exports.getMyPatients = async (req, res) => {
 };
 
 
-exports.getPatients = asyncHandler(async (req, res) => {
-  console.log("\nGetting all patients for doctor");
-  
-  const doctor = await Doctor.findOne({ where: { user_id: req.user.id } });
-  if (!doctor || !doctor.is_approved) {
-    return res.status(403).json({
-      success: false,
-      message: 'Doctor not found or not approved'
-    });
-  }
-  
-  // Find patients who have medical records from this doctor
-  const patients = await Patient.findAll({
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'first_name', 'last_name', 'email', 'phone']
-      }
-    ],
-    // FIXED: Changed 'created_at' to 'createdAt' or remove ordering
-    order: [[{ model: User, as: 'user' }, 'first_name', 'ASC']]
-  });
-  
-  // For each patient, add their latest medical record from this doctor
-  const patientsWithRecords = await Promise.all(
-    patients.map(async (patient) => {
-      const patientData = patient.toJSON();
-      
-      // Get last medical record from this doctor for this patient
-      const lastRecord = await MedicalRecord.findOne({
-        where: {
-          patient_id: patient.id,
-          doctor_id: doctor.id
-        },
-        order: [['date', 'DESC']],
-        attributes: ['id', 'title', 'record_type', 'date', 'createdAt'] // Fixed here too
-      });
-      
-      patientData.last_record = lastRecord;
-      return patientData;
-    })
-  );
-  
-  res.status(200).json({
-    success: true,
-    count: patientsWithRecords.length,
-    data: patientsWithRecords
-  });
-});
+/**
+ * Get all patients (doctor can see any patient if approved)
+ */
+exports.getPatients = async (req, res) => {
+    try {
+        const doctorId = req.user.id;
+        
+        // Check if doctor is approved - UPDATED to use is_approved
+        const doctor = await Doctor.findOne({ where: { user_id: doctorId } });
+        if (!doctor || !doctor.is_approved) {  // Changed from is_verified to is_approved
+            return res.status(403).json({
+                success: false,
+                message: 'You must be an approved doctor to access patients'
+            });
+        }
+
+        const { 
+            page = 1, 
+            limit = 20, 
+            search = '',
+            sort_by = 'name_asc',
+            has_medical_records = 'false'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // Build where clause for patients
+        const where = {};
+        
+        if (search) {
+            where[Op.or] = [
+                { '$user.first_name$': { [Op.iLike]: `%${search}%` } },
+                { '$user.last_name$': { [Op.iLike]: `%${search}%` } },
+                { '$user.email$': { [Op.iLike]: `%${search}%` } },
+                { '$user.phone$': { [Op.iLike]: `%${search}%` } }
+            ];
+        }
+
+        // Determine sort order
+        let order = [];
+        switch (sort_by) {
+            case 'name_asc':
+                order = [[{ model: User, as: 'user' }, 'first_name', 'ASC']];
+                break;
+            case 'name_desc':
+                order = [[{ model: User, as: 'user' }, 'first_name', 'DESC']];
+                break;
+            case 'recent':
+                order = [[{ model: User, as: 'user' }, 'created_at', 'DESC']];
+                break;
+            case 'oldest':
+                order = [[{ model: User, as: 'user' }, 'created_at', 'ASC']];
+                break;
+            default:
+                order = [[{ model: User, as: 'user' }, 'first_name', 'ASC']];
+        }
+
+        // Get total count
+        const total = await Patient.count({
+            where,
+            include: [{
+                model: User,
+                as: 'user',
+                attributes: []
+            }]
+        });
+
+        // Get patients with user info
+        const patients = await Patient.findAll({
+            where,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order,
+            include: [{
+                model: User,
+                as: 'user',
+                attributes: ['id', 'first_name', 'last_name', 'email', 'phone', 'avatar']
+            }]
+        });
+
+        // If requested, add medical record info for each patient from this doctor
+        if (has_medical_records === 'true') {
+            const patientsWithRecords = await Promise.all(
+                patients.map(async (patient) => {
+                    const patientData = patient.toJSON();
+                    
+                    // Get last medical record from this doctor for this patient
+                    const lastRecord = await MedicalRecord.findOne({
+                        where: {
+                            patient_id: patient.id,
+                            doctor_id: doctor.id
+                        },
+                        order: [['date', 'DESC']],
+                        attributes: ['id', 'title', 'record_type', 'date']
+                    });
+                    
+                    // Get prescription count from this doctor
+                    const prescriptionCount = await Prescription.count({
+                        where: {
+                            patient_id: patient.id,
+                            doctor_id: doctor.id,
+                            isActive: true
+                        }
+                    });
+                    
+                    // Get lab test count from this doctor
+                    const labTestCount = await LabTest.count({
+                        where: {
+                            patient_id: patient.id,
+                            doctor_id: doctor.id,
+                            status: { [Op.in]: ['pending', 'in_progress'] }
+                        }
+                    });
+                    
+                    patientData.last_consultation = lastRecord;
+                    patientData.active_prescriptions = prescriptionCount;
+                    patientData.pending_tests = labTestCount;
+                    
+                    return patientData;
+                })
+            );
+
+            res.status(200).json({
+                success: true,
+                data: {
+                    patients: patientsWithRecords,
+                    pagination: {
+                        total,
+                        page: parseInt(page),
+                        limit: parseInt(limit),
+                        pages: Math.ceil(total / limit)
+                    }
+                }
+            });
+        } else {
+            res.status(200).json({
+                success: true,
+                data: {
+                    patients,
+                    pagination: {
+                        total,
+                        page: parseInt(page),
+                        limit: parseInt(limit),
+                        pages: Math.ceil(total / limit)
+                    }
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error('Error fetching patients:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch patients',
+            error: error.message
+        });
+    }
+};
 
 /**
  * Search patients for a doctor
